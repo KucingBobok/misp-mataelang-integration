@@ -1,0 +1,143 @@
+{
+  "info": {
+    "name": "MISP-MataElang Integration API v1.1",
+    "description": "Set BASE_URL and API_KEY variables before running.\nAll protected endpoints require X-API-Key header.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "BASE_URL", "value": "http://localhost:8090", "type": "string"},
+    {"key": "API_KEY",  "value": "your_service_api_key_here", "type": "string"}
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {"key": "key",   "value": "X-API-Key", "type": "string"},
+      {"key": "value", "value": "{{API_KEY}}", "type": "string"},
+      {"key": "in",    "value": "header", "type": "string"}
+    ]
+  },
+  "item": [
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "Health Check (no auth)",
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "GET",
+            "url": "{{BASE_URL}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth Tests",
+      "item": [
+        {
+          "name": "Reject — no key (expect 401)",
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "POST",
+            "url": "{{BASE_URL}}/sync/misp"
+          }
+        },
+        {
+          "name": "Reject — wrong key (expect 401)",
+          "request": {
+            "auth": {"type": "apikey", "apikey": [
+              {"key": "key", "value": "X-API-Key"},
+              {"key": "value", "value": "wrongkey"},
+              {"key": "in", "value": "header"}
+            ]},
+            "method": "POST",
+            "url": "{{BASE_URL}}/sync/misp"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MISP",
+      "item": [
+        {
+          "name": "Trigger MISP IOC Sync",
+          "request": {"method": "POST", "url": "{{BASE_URL}}/sync/misp"}
+        },
+        {
+          "name": "Send Sighting",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/sighting",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"ioc_value\": \"185.220.101.45\",\n  \"timestamp\": \"2026-04-22T05:00:00\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "IOC Store",
+      "item": [
+        {
+          "name": "IOC Stats",
+          "request": {"method": "GET", "url": "{{BASE_URL}}/ioc/stats"}
+        },
+        {
+          "name": "Lookup — clean IP",
+          "request": {"method": "GET", "url": {"raw": "{{BASE_URL}}/ioc/search?value=8.8.8.8", "query": [{"key": "value", "value": "8.8.8.8"}]}}
+        },
+        {
+          "name": "Lookup — Tor exit node",
+          "request": {"method": "GET", "url": {"raw": "{{BASE_URL}}/ioc/search?value=185.220.101.45", "query": [{"key": "value", "value": "185.220.101.45"}]}}
+        },
+        {
+          "name": "Clear IOC Store (DANGER)",
+          "request": {"method": "DELETE", "url": "{{BASE_URL}}/ioc/store"}
+        }
+      ]
+    },
+    {
+      "name": "Enrichment",
+      "item": [
+        {
+          "name": "Enrich — Clean IP (miss)",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/enrich/alert",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"alert_id\": \"v11-clean-001\",\n  \"sensor_id\": \"sensor1\",\n  \"src_ip\": \"8.8.8.8\",\n  \"dst_ip\": \"10.10.10.5\",\n  \"signature\": \"DNS Query to Google\",\n  \"timestamp\": \"2026-04-22T05:00:00\"\n}"}
+          }
+        },
+        {
+          "name": "Enrich — Tor Exit Node (hit if MISP populated)",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/enrich/alert",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"alert_id\": \"v11-tor-001\",\n  \"sensor_id\": \"sensor1\",\n  \"src_ip\": \"185.220.101.45\",\n  \"dst_ip\": \"192.168.1.100\",\n  \"signature\": \"ET TOR Known Tor Exit Node Traffic\",\n  \"priority\": 1,\n  \"timestamp\": \"2026-04-22T05:00:00\"\n}"}
+          }
+        },
+        {
+          "name": "Enrich — Malicious Domain",
+          "request": {
+            "method": "POST",
+            "url": "{{BASE_URL}}/enrich/alert",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"alert_id\": \"v11-domain-001\",\n  \"sensor_id\": \"sensor1\",\n  \"src_ip\": \"192.168.1.50\",\n  \"domain\": \"malware-c2.example.com\",\n  \"signature\": \"ET DNS Malicious Domain\",\n  \"timestamp\": \"2026-04-22T05:00:00\"\n}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "NIDS Rules",
+      "item": [
+        {
+          "name": "Download — Snort",
+          "request": {"method": "GET", "url": "{{BASE_URL}}/rules/snort"}
+        },
+        {
+          "name": "Download — Suricata",
+          "request": {"method": "GET", "url": "{{BASE_URL}}/rules/suricata"}
+        }
+      ]
+    }
+  ]
+}

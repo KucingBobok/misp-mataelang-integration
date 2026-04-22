@@ -1,0 +1,11 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+httpx==0.28.1
+opensearch-py==2.8.0
+confluent-kafka==2.8.0
+APScheduler==3.10.4
+python-dotenv==1.0.1
+# v1.1 additions
+redis[hiredis]==5.2.1       # async Redis client with C-extension for performance

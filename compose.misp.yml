@@ -1,0 +1,84 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# MISP ↔ Mata Elang Integration Service — Docker Compose Add-on  v1.1
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# v1.1 changes vs v1.0:
+#   • Redis service now has password authentication (REDIS_PASSWORD env)
+#   • Redis uses appendonly AOF for durability (survive container restarts)
+#   • Integration service is a non-root user inside container
+#   • Service reads API key(s) from env (mandatory — will not start without them)
+#
+# Deploy:
+#   1. cd defense_center && docker compose up -d      (Mata Elang must be running)
+#   2. cp .env.example .env && nano .env              (fill all required values)
+#   3. docker compose -f compose.misp.yml up -d
+# ══════════════════════════════════════════════════════════════════════════════
+
+name: mataelang-misp
+
+services:
+
+  # ── MISP Integration Service ───────────────────────────────────────────────
+  misp-integration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/mata-elang-stable/misp-integration-service:v1.1
+    container_name: misp-integration
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8090:8080"
+    volumes:
+      # Mata Elang mTLS certs (read-only) for Kafka authentication
+      - mataelang_certs:/certs:ro
+    networks:
+      - mataelang_default
+    depends_on:
+      misp-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Redis — IOC persistence (v1.1) ────────────────────────────────────────
+  misp-redis:
+    image: valkey/valkey:8-alpine
+    container_name: misp-redis
+    restart: unless-stopped
+    command: >
+      valkey-server
+        --requirepass ${REDIS_PASSWORD:-RedisSecurePassword@123}
+        --appendonly yes
+        --appendfsync everysec
+        --maxmemory 512mb
+        --maxmemory-policy allkeys-lru
+        --loglevel notice
+    environment:
+      - VALKEY_LOGLEVEL=notice
+    volumes:
+      - misp_redis_data:/data
+    networks:
+      - mataelang_default
+    healthcheck:
+      test: ["CMD", "valkey-cli",
+             "-a", "${REDIS_PASSWORD:-RedisSecurePassword@123}",
+             "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  misp_redis_data:
+    driver: local
+  mataelang_certs:
+    external: true     # Created by defense_center/compose.yml cert generator
+
+networks:
+  mataelang_default:
+    external: true     # Must already exist from defense_center stack
